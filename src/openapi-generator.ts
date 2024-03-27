@@ -63,6 +63,7 @@ import { enumInfo } from './lib/enum-info';
 import {
   compact,
   isNil,
+  isString,
   mapValues,
   objectEquals,
   omit,
@@ -654,7 +655,7 @@ export class OpenAPIGenerator {
 
   private getBodyContent(content: ZodContentObject): ContentObject {
     return mapValues(content, config => {
-      if (!isAnyZodType(config.schema)) {
+      if (!config || !isAnyZodType(config.schema)) {
         return config;
       }
 
@@ -992,10 +993,36 @@ export class OpenAPIGenerator {
 
     if (isZodType(zodSchema, 'ZodRecord')) {
       const propertiesType = zodSchema._def.valueType;
+      const keyType = zodSchema._def.keyType;
+
+      const propertiesSchema = this.generateSchemaWithRef(propertiesType);
+
+      if (
+        isZodType(keyType, 'ZodEnum') ||
+        isZodType(keyType, 'ZodNativeEnum')
+      ) {
+        // Native enums have their keys as both number and strings however the number is an
+        // internal representation and the string is the access point for a documentation
+        const keys = Object.values(keyType.enum).filter(isString);
+
+        const properties = keys.reduce(
+          (acc, curr) => ({
+            ...acc,
+            [curr]: propertiesSchema,
+          }),
+          {} as SchemaObject['properties']
+        );
+
+        return {
+          ...this.mapNullableType('object', isNullable),
+          properties,
+          default: defaultValue,
+        };
+      }
 
       return {
         ...this.mapNullableType('object', isNullable),
-        additionalProperties: this.generateSchemaWithRef(propertiesType),
+        additionalProperties: propertiesSchema,
         default: defaultValue,
       };
     }
