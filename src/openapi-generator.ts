@@ -922,28 +922,11 @@ export class OpenAPIGenerator {
     if (isZodType(zodSchema, 'ZodTuple')) {
       const { items } = zodSchema._def;
 
-      const tupleLength = items.length;
-
       const schemas = items.map(schema => this.generateSchemaWithRef(schema));
-
-      const uniqueSchemas = uniq(schemas);
-
-      if (uniqueSchemas.length === 1) {
-        return {
-          type: 'array',
-          items: uniqueSchemas[0],
-          minItems: tupleLength,
-          maxItems: tupleLength,
-        };
-      }
 
       return {
         ...this.mapNullableType('array', isNullable),
-        items: {
-          anyOf: uniqueSchemas,
-        },
-        minItems: tupleLength,
-        maxItems: tupleLength,
+        prefixItems: schemas,
       };
     }
 
